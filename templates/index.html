@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Mood2Music</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#020818;--bg2:#050f2e;--mid:#0a1f5c;
+  --neon:#00c3ff;--accent:#00ffe7;--accent2:#7b5cff;
+  --pink:#ff6b9d;--gold:#ffd700;
+  --text:#e8f4ff;--muted:#6a9fd8;
+  --card:rgba(10,31,92,0.45);--border:rgba(0,195,255,0.18);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans SC',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:
+  linear-gradient(180deg,#020818 0%,#050f2e 50%,#020818 100%),
+  repeating-linear-gradient(0deg,transparent,transparent 60px,rgba(0,195,255,0.04) 60px,rgba(0,195,255,0.04) 61px),
+  repeating-linear-gradient(90deg,transparent,transparent 60px,rgba(0,195,255,0.04) 60px,rgba(0,195,255,0.04) 61px);
+  z-index:-2}
+body::after{content:'';position:fixed;top:-20%;left:50%;transform:translateX(-50%);width:900px;height:450px;
+  background:radial-gradient(ellipse,rgba(26,110,245,0.13) 0%,transparent 70%);z-index:-1;pointer-events:none}
+
+/* ── header ── */
+header{text-align:center;padding:40px 20px 20px}
+.logo{font-family:'Orbitron',monospace;font-size:34px;font-weight:900;letter-spacing:4px;
+  background:linear-gradient(90deg,var(--neon),var(--accent),#7b5cff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.subtitle{font-size:12px;letter-spacing:3px;color:var(--muted);margin-top:6px;text-transform:uppercase}
+
+/* ── tabs ── */
+.nav-tabs{display:flex;justify-content:center;gap:4px;padding:0 16px 24px;flex-wrap:wrap}
+.tab-btn{font-family:'Orbitron',monospace;font-size:10px;letter-spacing:1.5px;padding:7px 14px;
+  border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;
+  border-radius:2px;transition:all 0.2s;text-transform:uppercase;white-space:nowrap}
+.tab-btn.active,.tab-btn:hover{border-color:var(--neon);color:var(--neon);background:rgba(0,195,255,0.08);
+  box-shadow:0 0 12px rgba(0,195,255,0.2)}
+
+/* ── main ── */
+.main{max-width:880px;margin:0 auto;padding:0 18px 60px}
+.panel{display:none}.panel.active{display:block}
+
+/* ── 通用卡片 ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:4px;
+  backdrop-filter:blur(12px);padding:14px 16px}
+
+/* ── 输入区 ── */
+.input-wrap{position:relative;margin-bottom:10px}
+.input-wrap input{width:100%;padding:16px 56px 16px 22px;background:var(--card);
+  border:1px solid var(--border);border-radius:4px;color:var(--text);
+  font-family:'Noto Sans SC',sans-serif;font-size:15px;outline:none;
+  transition:border-color 0.2s,box-shadow 0.2s;backdrop-filter:blur(12px)}
+.input-wrap input::placeholder{color:var(--muted)}
+.input-wrap input:focus{border-color:var(--neon);box-shadow:0 0 20px rgba(0,195,255,0.15)}
+.input-wrap .send-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--neon);font-size:22px;cursor:pointer;transition:transform 0.2s}
+.input-wrap .send-btn:hover{transform:translateY(-50%) scale(1.2)}
+
+.gen-btn{width:100%;padding:14px;background:linear-gradient(90deg,#1a6ef5,var(--neon));
+  border:none;border-radius:4px;color:#fff;font-family:'Orbitron',monospace;
+  font-size:12px;letter-spacing:3px;cursor:pointer;transition:opacity 0.2s,box-shadow 0.2s;
+  text-transform:uppercase;margin-bottom:18px}
+.gen-btn:hover{opacity:0.9;box-shadow:0 0 24px rgba(0,195,255,0.4)}
+.gen-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+/* ── 情绪badge ── */
+.mood-badge{display:none;align-items:center;gap:12px;padding:12px 18px;
+  background:var(--card);border:1px solid var(--border);border-left:3px solid var(--accent);
+  border-radius:4px;margin-bottom:16px;backdrop-filter:blur(12px)}
+.mood-badge.show{display:flex}
+.mood-icon{font-size:26px}
+.mood-text h3{font-family:'Orbitron',monospace;font-size:11px;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
+.mood-text p{font-size:13px;color:var(--muted);margin-top:2px}
+
+/* ── loading ── */
+.loading{display:none;text-align:center;padding:28px;color:var(--neon);
+  font-family:'Orbitron',monospace;font-size:11px;letter-spacing:3px}
+.loading.show{display:block}
+.loading-bar{height:2px;margin-top:10px;background:linear-gradient(90deg,transparent,var(--neon),transparent);
+  animation:scan 1.5s infinite}
+@keyframes scan{0%{opacity:0.3}50%{opacity:1}100%{opacity:0.3}}
+
+/* ── 歌曲卡片 ── */
+.songs-list{display:flex;flex-direction:column;gap:9px}
+.song-card{display:flex;align-items:center;gap:14px;padding:12px 14px;
+  background:var(--card);border:1px solid var(--border);border-radius:4px;
+  backdrop-filter:blur(12px);transition:border-color 0.2s,transform 0.2s;
+  animation:fadeUp 0.4s both;position:relative;overflow:hidden}
+.song-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:linear-gradient(180deg,var(--neon),var(--accent2));opacity:0;transition:opacity 0.2s}
+.song-card:hover{border-color:rgba(0,195,255,0.4);transform:translateX(4px)}
+.song-card:hover::before{opacity:1}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.song-card img{width:60px;height:60px;border-radius:4px;object-fit:cover;
+  flex-shrink:0;border:1px solid var(--border)}
+.song-info{flex:1;min-width:0}
+.song-info h4{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.song-info .artist{font-size:12px;color:var(--neon);margin:3px 0}
+.song-info .album{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+audio{width:100%;height:26px;margin-top:7px;filter:invert(1) hue-rotate(180deg);opacity:0.75}
+.song-actions{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
+.act-btn{background:none;border:1px solid var(--border);border-radius:3px;color:var(--muted);
+  font-size:13px;width:30px;height:30px;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;transition:all 0.2s}
+.act-btn:hover{border-color:var(--neon);color:var(--neon)}
+.act-btn.fav-on{border-color:var(--pink);color:var(--pink)}
+.open-link{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);
+  text-decoration:none;margin-top:5px;transition:color 0.2s;letter-spacing:1px}
+.open-link:hover{color:var(--neon)}
+
+/* ── 天气面板 ── */
+.weather-top{display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:12px;margin-bottom:20px}
+.weather-card-big{background:var(--card);border:1px solid var(--border);border-radius:4px;
+  padding:20px 24px;backdrop-filter:blur(12px);display:flex;align-items:center;gap:20px;flex:1;min-width:200px}
+.weather-emoji{font-size:52px}
+.weather-info h2{font-family:'Orbitron',monospace;font-size:22px;color:var(--neon)}
+.weather-info p{font-size:13px;color:var(--muted);margin-top:4px}
+.locate-btn{padding:10px 20px;background:transparent;border:1px solid var(--neon);
+  color:var(--neon);border-radius:4px;cursor:pointer;font-family:'Orbitron',monospace;
+  font-size:10px;letter-spacing:2px;transition:all 0.2s;white-space:nowrap}
+.locate-btn:hover{background:rgba(0,195,255,0.1);box-shadow:0 0 16px rgba(0,195,255,0.3)}
+
+/* ── 照片面板 ── */
+.photo-upload-area{border:2px dashed var(--border);border-radius:8px;padding:40px 20px;
+  text-align:center;cursor:pointer;transition:border-color 0.2s;margin-bottom:18px;position:relative}
+.photo-upload-area:hover{border-color:var(--neon)}
+.photo-upload-area input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-icon{font-size:44px;margin-bottom:12px}
+.upload-text{font-size:14px;color:var(--muted)}
+.photo-preview{max-width:100%;max-height:220px;border-radius:6px;margin:0 auto 16px;
+  display:block;border:1px solid var(--border)}
+.color-strip{height:8px;border-radius:4px;margin-bottom:16px}
+
+/* ── 盲盒面板 ── */
+.blindbox-wrap{text-align:center;padding:20px 0}
+.blindbox-title{font-family:'Orbitron',monospace;font-size:18px;letter-spacing:3px;
+  color:var(--neon);margin-bottom:8px}
+.blindbox-sub{font-size:13px;color:var(--muted);margin-bottom:28px}
+.mystery-box{width:140px;height:140px;border:2px solid var(--neon);border-radius:12px;
+  margin:0 auto 24px;display:flex;align-items:center;justify-content:center;
+  font-size:56px;background:var(--card);cursor:pointer;
+  box-shadow:0 0 30px rgba(0,195,255,0.2);transition:transform 0.2s,box-shadow 0.2s;
+  animation:pulse 2s infinite}
+.mystery-box:hover{transform:scale(1.05);box-shadow:0 0 50px rgba(0,195,255,0.4)}
+@keyframes pulse{0%,100%{box-shadow:0 0 20px rgba(0,195,255,0.2)}50%{box-shadow:0 0 40px rgba(0,195,255,0.5)}}
+.blindbox-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:24px}
+.bb-btn{padding:11px 24px;border-radius:4px;cursor:pointer;font-family:'Orbitron',monospace;
+  font-size:11px;letter-spacing:2px;transition:all 0.2s;border:1px solid}
+.bb-btn.primary{background:linear-gradient(90deg,#1a6ef5,var(--neon));border-color:transparent;color:#fff}
+.bb-btn.secondary{background:transparent;border-color:var(--neon);color:var(--neon)}
+.bb-btn.secondary:hover{background:rgba(0,195,255,0.1)}
+.bb-btn:disabled{opacity:0.4;cursor:not-allowed}
+.reveal-card{background:var(--card);border:1px solid var(--border);border-radius:8px;
+  padding:20px;margin-top:20px;text-align:center;animation:fadeUp 0.5s both;display:none}
+.reveal-card.show{display:block}
+.reveal-card img{width:100px;height:100px;border-radius:8px;margin:0 auto 12px;display:block}
+.reveal-card h3{font-size:16px;font-weight:500;margin-bottom:4px}
+.reveal-card .r-artist{font-size:13px;color:var(--neon)}
+.reveal-card .r-album{font-size:12px;color:var(--muted);margin:4px 0 12px}
+.audio-blind{width:100%;height:28px;filter:invert(1) hue-rotate(180deg);opacity:0.8;margin-bottom:12px}
+
+/* ── 情绪DNA ── */
+.dna-wrap{text-align:center;padding:10px 0}
+.dna-title{font-family:'Orbitron',monospace;font-size:16px;letter-spacing:3px;color:var(--neon);margin-bottom:6px}
+.dna-sub{font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.6}
+#dna-canvas{border:1px solid var(--border);border-radius:8px;max-width:100%;
+  box-shadow:0 0 30px rgba(0,195,255,0.15)}
+.dna-btns{display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+.dna-btn{padding:10px 22px;border-radius:4px;cursor:pointer;font-family:'Orbitron',monospace;
+  font-size:10px;letter-spacing:2px;border:1px solid var(--neon);
+  background:transparent;color:var(--neon);transition:all 0.2s}
+.dna-btn:hover{background:rgba(0,195,255,0.1)}
+.dna-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:24px}
+.dna-stat{background:var(--card);border:1px solid var(--border);border-radius:4px;
+  padding:12px;text-align:center}
+.dna-stat-num{font-family:'Orbitron',monospace;font-size:22px;font-weight:700;color:var(--neon)}
+.dna-stat-label{font-size:11px;color:var(--muted);margin-top:3px}
+
+/* ── 聊天室弹窗 ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(2,8,24,0.88);z-index:200;
+  backdrop-filter:blur(8px);align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.chat-modal{background:var(--bg2);border:1px solid var(--border);border-radius:8px;
+  padding:24px;width:90%;max-width:440px;position:relative;
+  box-shadow:0 0 60px rgba(0,195,255,0.15);animation:fadeUp 0.3s both;max-height:80vh;overflow-y:auto}
+.chat-modal h3{font-family:'Orbitron',monospace;font-size:13px;letter-spacing:2px;
+  color:var(--neon);margin-bottom:4px}
+.chat-modal .chat-song{font-size:12px;color:var(--muted);margin-bottom:16px}
+.close-btn{position:absolute;top:14px;right:16px;background:none;border:none;
+  color:var(--muted);font-size:20px;cursor:pointer}
+.comments-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;max-height:220px;overflow-y:auto}
+.comment-item{background:rgba(0,195,255,0.05);border:1px solid var(--border);
+  border-radius:4px;padding:10px 12px}
+.comment-text{font-size:13px;color:var(--text);line-height:1.5}
+.comment-time{font-size:11px;color:var(--muted);margin-top:4px}
+.comment-empty{font-size:13px;color:var(--muted);text-align:center;padding:20px}
+.chat-input-row{display:flex;gap:8px}
+.chat-input-row input{flex:1;padding:10px 14px;background:var(--card);
+  border:1px solid var(--border);border-radius:4px;color:var(--text);
+  font-family:'Noto Sans SC',sans-serif;font-size:13px;outline:none}
+.chat-input-row input:focus{border-color:var(--neon)}
+.chat-input-row button{padding:10px 18px;background:var(--neon);border:none;
+  border-radius:4px;color:#000;font-size:13px;cursor:pointer;font-weight:500;white-space:nowrap}
+
+/* ── 收藏/历史面板 ── */
+.history-item{display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;background:var(--card);border:1px solid var(--border);
+  border-radius:4px;margin-bottom:8px;animation:fadeUp 0.3s both}
+.history-mood{font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px;color:var(--neon);text-transform:uppercase}
+.history-text{font-size:13px;color:var(--text);margin-top:3px}
+.history-time{font-size:11px;color:var(--muted)}
+.empty-state{text-align:center;padding:56px 20px;color:var(--muted);
+  font-family:'Orbitron',monospace;font-size:11px;letter-spacing:2px}
+.empty-state .ei{font-size:44px;margin-bottom:14px;opacity:0.35}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--mid);border-radius:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">MOOD2MUSIC</div>
+  <div class="subtitle">情绪驱动 · 天气配乐 · 照片配乐 · 盲盒推歌</div>
+</header>
+
+<div class="nav-tabs">
+  <button class="tab-btn active" onclick="switchTab('discover',this)">🎵 发现</button>
+  <button class="tab-btn" onclick="switchTab('weather',this)">🌤 天气配乐</button>
+  <button class="tab-btn" onclick="switchTab('photo',this)">📸 照片配乐</button>
+  <button class="tab-btn" onclick="switchTab('blindbox',this)">🎰 盲盒推歌</button>
+  <button class="tab-btn" onclick="switchTab('dna',this)">🧬 情绪DNA</button>
+  <button class="tab-btn" onclick="switchTab('favorites',this)">♥ 收藏</button>
+  <button class="tab-btn" onclick="switchTab('history',this)">⏱ 历史</button>
+</div>
+
+<div class="main">
+
+<!-- ── 发现 ── -->
+<div id="discover" class="panel active">
+  <div class="input-wrap">
+    <input id="mood-input" placeholder="说说心情，或「我想听周杰伦的歌」…" onkeydown="if(event.key==='Enter')generate()">
+    <button class="send-btn" onclick="generate()">⚡</button>
+  </div>
+  <button class="gen-btn" id="gen-btn" onclick="generate()">生成推荐</button>
+  <div class="mood-badge" id="mood-badge">
+    <div class="mood-icon" id="mood-icon">🎭</div>
+    <div class="mood-text"><h3 id="mood-label">情绪识别</h3><p id="mood-reason"></p></div>
+  </div>
+  <div class="loading" id="loading"><div>正在分析情绪 · 搜索歌曲</div><div class="loading-bar"></div></div>
+  <div class="songs-list" id="result"></div>
+</div>
+
+<!-- ── 天气配乐 ── -->
+<div id="weather" class="panel">
+  <div class="weather-top">
+    <div class="weather-card-big" id="weather-card">
+      <div class="weather-emoji" id="w-emoji">🌤️</div>
+      <div class="weather-info">
+        <h2 id="w-temp">-- °C</h2>
+        <p id="w-desc">点击右侧按钮获取当前天气</p>
+      </div>
+    </div>
+    <button class="locate-btn" onclick="getWeather()">📍 获取位置<br>匹配配乐</button>
+  </div>
+  <div class="loading" id="w-loading"><div>正在获取天气数据…</div><div class="loading-bar"></div></div>
+  <div class="songs-list" id="w-result"></div>
+</div>
+
+<!-- ── 照片配乐 ── -->
+<div id="photo" class="panel">
+  <div class="photo-upload-area" id="upload-area">
+    <input type="file" accept="image/*" onchange="handlePhoto(this)">
+    <div class="upload-icon">📷</div>
+    <div class="upload-text">点击或拖拽上传一张照片<br><span style="font-size:12px;color:var(--muted)">AI分析色调氛围，为你配乐</span></div>
+  </div>
+  <div id="photo-result"></div>
+</div>
+
+<!-- ── 盲盒推歌 ── -->
+<div id="blindbox" class="panel">
+  <div class="blindbox-wrap">
+    <div class="blindbox-title">🎰 盲盒推歌</div>
+    <div class="blindbox-sub">不告诉你是谁的歌<br>只放30秒 · 听完再决定要不要揭晓</div>
+    <div class="mystery-box" id="mystery-box" onclick="drawBlindbox()">🎁</div>
+    <div class="blindbox-btns">
+      <button class="bb-btn primary" onclick="drawBlindbox()" id="draw-btn">抽一首</button>
+      <button class="bb-btn secondary" id="reveal-btn" onclick="revealSong()" disabled>揭晓答案</button>
+    </div>
+    <div class="reveal-card" id="reveal-card">
+      <img id="r-cover" src="" alt="">
+      <h3 id="r-title"></h3>
+      <div class="r-artist" id="r-artist"></div>
+      <div class="r-album" id="r-album"></div>
+      <a id="r-link" href="#" target="_blank" style="font-size:12px;color:var(--neon);letter-spacing:1px">▶ Apple Music 播放完整版</a>
+    </div>
+    <div id="bb-loading" class="loading"><div>正在随机抽取…</div><div class="loading-bar"></div></div>
+  </div>
+</div>
+
+<!-- ── 情绪DNA ── -->
+<div id="dna" class="panel">
+  <div class="dna-wrap">
+    <div class="dna-title">🧬 情绪DNA图谱</div>
+    <div class="dna-sub">基于你的历史搜索记录<br>生成专属于你的情绪基因图谱</div>
+    <div class="dna-stats" id="dna-stats"></div>
+    <canvas id="dna-canvas" width="600" height="300"></canvas>
+    <div class="dna-btns">
+      <button class="dna-btn" onclick="drawDNA()">重新生成</button>
+      <button class="dna-btn" onclick="saveDNA()">保存图片</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 收藏 ── -->
+<div id="favorites" class="panel">
+  <div class="songs-list" id="fav-list"></div>
+</div>
+
+<!-- ── 历史 ── -->
+<div id="history" class="panel">
+  <div id="history-list"></div>
+</div>
+
+</div>
+
+<!-- 聊天室弹窗 -->
+<div class="overlay" id="chat-overlay" onclick="closeChatIfBg(event)">
+  <div class="chat-modal">
+    <button class="close-btn" onclick="closeChat()">✕</button>
+    <h3>💬 歌曲聊天室</h3>
+    <div class="chat-song" id="chat-song-label"></div>
+    <div class="comments-list" id="comments-list"></div>
+    <div class="chat-input-row">
+      <input id="comment-input" placeholder="留下你的感受…（匿名）" maxlength="100" onkeydown="if(event.key==='Enter')submitComment()">
+      <button onclick="submitComment()">发送</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 持久化 ──
+let favorites  = JSON.parse(localStorage.getItem('m2m_fav')  || '[]');
+let history    = JSON.parse(localStorage.getItem('m2m_hist') || '[]');
+let moodStats  = JSON.parse(localStorage.getItem('m2m_stats')|| '{"happy":0,"sad":0,"angry":0,"chill":0,"artist":0}');
+function save(){
+  localStorage.setItem('m2m_fav',   JSON.stringify(favorites));
+  localStorage.setItem('m2m_hist',  JSON.stringify(history));
+  localStorage.setItem('m2m_stats', JSON.stringify(moodStats));
+}
+
+const moodMeta = {
+  happy:  {icon:'😄',label:'HAPPY · 快乐', color:'#ffd700'},
+  sad:    {icon:'🌧️',label:'SAD · 悲伤',   color:'#6ab4ff'},
+  angry:  {icon:'⚡',label:'ANGRY · 激烈', color:'#ff6b6b'},
+  chill:  {icon:'🌊',label:'CHILL · 平静', color:'#00ffe7'},
+  artist: {icon:'🎤',label:'ARTIST · 歌手',color:'#b57aff'},
+};
+
+// ── tab切换 ──
+function switchTab(id, btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='favorites') renderFavorites();
+  if(id==='history')   renderHistory();
+  if(id==='dna')       {renderDNAStats(); drawDNA();}
+}
+
+// ── 工具 ──
+function esc(s){return(s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}
+function fallbackImg(){return'https://via.placeholder.com/60/0a1f5c/00c3ff?text=♪'}
+
+// ── 渲染歌曲列表 ──
+function renderSongs(songs, containerId, showFav=true){
+  const el = document.getElementById(containerId);
+  if(!songs||!songs.length){
+    el.innerHTML='<div class="empty-state"><div class="ei">🎵</div>暂无结果，换个心情试试</div>';
+    return;
+  }
+  el.innerHTML = songs.map((s,i)=>{
+    const isFav = favorites.some(f=>f.title===s.title&&f.artist===s.artist);
+    const key = esc(`${s.title}::${s.artist}`);
+    return `
+    <div class="song-card" style="animation-delay:${i*0.06}s">
+      <img src="${s.cover||fallbackImg()}" onerror="this.src='${fallbackImg()}'">
+      <div class="song-info">
+        <h4>${s.title}</h4>
+        <div class="artist">${s.artist}</div>
+        <div class="album">💿 ${s.album||'未知专辑'}</div>
+        ${s.preview?`<audio controls src="${s.preview}"></audio>`:''}
+        <a class="open-link" href="${s.url}" target="_blank">▶ Apple Music</a>
+      </div>
+      <div class="song-actions">
+        ${showFav?`<button class="act-btn ${isFav?'fav-on':''}" onclick="toggleFav(this,'${esc(s.title)}','${esc(s.artist)}','${esc(s.album)}','${esc(s.cover)}','${esc(s.url)}')" title="收藏">${isFav?'♥':'♡'}</button>`:''}
+        <button class="act-btn" onclick="openChat('${esc(s.title)}','${esc(s.artist)}')" title="聊天室">💬</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── 发现面板 ──
+function generate(){
+  const text = document.getElementById('mood-input').value.trim();
+  if(!text) return;
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('mood-badge').classList.remove('show');
+  document.getElementById('result').innerHTML='';
+  document.getElementById('gen-btn').disabled=true;
+  fetch('/recommend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mood:text})})
+  .then(r=>r.json()).then(data=>{
+    document.getElementById('loading').classList.remove('show');
+    document.getElementById('gen-btn').disabled=false;
+    const meta = moodMeta[data.mood]||moodMeta.chill;
+    document.getElementById('mood-icon').textContent=meta.icon;
+    document.getElementById('mood-label').textContent=meta.label;
+    document.getElementById('mood-reason').textContent=data.reason;
+    document.getElementById('mood-badge').classList.add('show');
+    if(moodStats[data.mood]!==undefined) moodStats[data.mood]++;
+    else moodStats[data.mood]=1;
+    history.unshift({mood:data.mood,text,time:new Date().toLocaleString('zh-CN'),songs:data.songs.length});
+    if(history.length>30) history.pop();
+    save();
+    renderSongs(data.songs,'result');
+  }).catch(()=>{
+    document.getElementById('loading').classList.remove('show');
+    document.getElementById('gen-btn').disabled=false;
+    document.getElementById('result').innerHTML='<div class="empty-state"><div class="ei">⚠️</div>连接失败，请检查后端</div>';
+  });
+}
+
+// ── 收藏 ──
+function toggleFav(btn,title,artist,album,cover,url){
+  const idx=favorites.findIndex(f=>f.title===title&&f.artist===artist);
+  if(idx>=0){favorites.splice(idx,1);btn.textContent='♡';btn.classList.remove('fav-on');}
+  else{favorites.unshift({title,artist,album,cover,url});btn.textContent='♥';btn.classList.add('fav-on');}
+  save();
+}
+function renderFavorites(){
+  if(!favorites.length){
+    document.getElementById('fav-list').innerHTML='<div class="empty-state"><div class="ei">♡</div>还没有收藏歌曲<br><br>在发现页点 ♡ 收藏</div>';
+    return;
+  }
+  renderSongs(favorites,'fav-list',false);
+}
+
+// ── 历史 ──
+function renderHistory(){
+  const el=document.getElementById('history-list');
+  if(!history.length){el.innerHTML='<div class="empty-state"><div class="ei">⏱</div>还没有搜索记录</div>';return;}
+  el.innerHTML=history.map((h,i)=>{
+    const meta=moodMeta[h.mood]||moodMeta.chill;
+    return `<div class="history-item" style="animation-delay:${i*0.04}s">
+      <div><div class="history-mood">${meta.icon} ${meta.label}</div><div class="history-text">${h.text}</div></div>
+      <div style="text-align:right"><div class="history-time">${h.time}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">${h.songs} 首</div></div>
+    </div>`;
+  }).join('');
+}
+
+// ── 天气配乐 ──
+const wtypeEmoji={sunny:'☀️',cloudy:'⛅',rainy:'🌧️',stormy:'⛈️',snowy:'❄️',foggy:'🌫️',windy:'💨'};
+function getWeather(){
+  const wl=document.getElementById('w-loading');
+  wl.classList.add('show');
+  document.getElementById('w-result').innerHTML='';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    fetch('/weather',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({lat:pos.coords.latitude,lon:pos.coords.longitude})})
+    .then(r=>r.json()).then(data=>{
+      wl.classList.remove('show');
+      document.getElementById('w-emoji').textContent=wtypeEmoji[data.wtype]||'🌤️';
+      document.getElementById('w-temp').textContent=`${data.temp} °C`;
+      document.getElementById('w-desc').textContent=`${data.weather} · 推荐${moodMeta[data.mood]?.label||''}歌单`;
+      renderSongs(data.songs,'w-result');
+    }).catch(()=>wl.classList.remove('show'));
+  }, ()=>{
+    // 定位失败用默认城市（北京）
+    fetch('/weather',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:39.9,lon:116.4})})
+    .then(r=>r.json()).then(data=>{
+      wl.classList.remove('show');
+      document.getElementById('w-emoji').textContent=wtypeEmoji[data.wtype]||'🌤️';
+      document.getElementById('w-temp').textContent=`${data.temp} °C`;
+      document.getElementById('w-desc').textContent=`${data.weather}（默认北京）`;
+      renderSongs(data.songs,'w-result');
+    }).catch(()=>wl.classList.remove('show'));
+  });
+}
+
+// ── 照片配乐 ──
+function handlePhoto(input){
+  const file=input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const b64=e.target.result;
+    const area=document.getElementById('upload-area');
+    area.innerHTML=`<img class="photo-preview" src="${b64}"><div class="upload-text" style="font-size:12px;color:var(--muted)">正在分析色调…</div>`;
+    document.getElementById('photo-result').innerHTML='<div class="loading show"><div>AI 正在分析照片氛围…</div><div class="loading-bar"></div></div>';
+    fetch('/photo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:b64})})
+    .then(r=>r.json()).then(data=>{
+      const c=data.colors;
+      const strip=`background:linear-gradient(90deg,rgb(${c.r},${Math.round(c.g*0.6)},${Math.round(c.b*0.4)}),rgb(${Math.round(c.r*0.4)},${c.g},${Math.round(c.b*0.8)}),rgb(${Math.round(c.r*0.3)},${Math.round(c.g*0.5)},${c.b}))`;
+      area.innerHTML=`<img class="photo-preview" src="${b64}"><div class="color-strip" style="${strip}"></div>
+        <div class="upload-text" style="font-size:12px;color:var(--muted)">点击重新上传</div>
+        <input type="file" accept="image/*" onchange="handlePhoto(this)" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
+      const meta=moodMeta[data.mood]||moodMeta.chill;
+      document.getElementById('photo-result').innerHTML=`
+        <div class="mood-badge show" style="margin-bottom:16px">
+          <div class="mood-icon">${meta.icon}</div>
+          <div class="mood-text"><h3>${meta.label}</h3><p>${data.desc}</p></div>
+        </div>
+        <div class="songs-list" id="photo-songs"></div>`;
+      renderSongs(data.songs,'photo-songs');
+    }).catch(()=>{document.getElementById('photo-result').innerHTML='<div class="empty-state"><div class="ei">⚠️</div>分析失败，请重试</div>';});
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── 盲盒 ──
+let bbRevealData=null;
+function drawBlindbox(){
+  const box=document.getElementById('mystery-box');
+  const loading=document.getElementById('bb-loading');
+  const revealCard=document.getElementById('reveal-card');
+  box.textContent='⏳';
+  loading.classList.add('show');
+  revealCard.classList.remove('show');
+  document.getElementById('reveal-btn').disabled=true;
+  bbRevealData=null;
+  // 先停掉旧音频
+  document.querySelectorAll('#bb-audio').forEach(a=>{a.pause();a.remove();});
+  fetch('/blindbox').then(r=>r.json()).then(data=>{
+    loading.classList.remove('show');
+    if(data.error){box.textContent='😢';return;}
+    bbRevealData=data.reveal;
+    box.textContent='🎵';
+    // 播放audio
+    const existing=document.getElementById('bb-audio-wrap');
+    if(existing) existing.remove();
+    const wrap=document.createElement('div');
+    wrap.id='bb-audio-wrap';
+    wrap.style.margin='0 auto 8px';
+    wrap.style.maxWidth='300px';
+    const audio=document.createElement('audio');
+    audio.id='bb-audio';
+    audio.controls=true;
+    audio.src=data.preview;
+    audio.className='audio-blind';
+    audio.autoplay=true;
+    wrap.appendChild(audio);
+    document.getElementById('mystery-box').after(wrap);
+    document.getElementById('reveal-btn').disabled=false;
+  }).catch(()=>{loading.classList.remove('show');box.textContent='😢';});
+}
+
+function revealSong(){
+  if(!bbRevealData) return;
+  const d=bbRevealData;
+  document.getElementById('r-cover').src=d.cover||fallbackImg();
+  document.getElementById('r-title').textContent=d.title;
+  document.getElementById('r-artist').textContent=d.artist;
+  document.getElementById('r-album').textContent='💿 '+(d.album||'未知专辑');
+  document.getElementById('r-link').href=d.url;
+  document.getElementById('reveal-card').classList.add('show');
+}
+
+// ── 情绪DNA ──
+function renderDNAStats(){
+  const total=Object.values(moodStats).reduce((a,b)=>a+b,0);
+  document.getElementById('dna-stats').innerHTML=`
+    <div class="dna-stat"><div class="dna-stat-num">${total}</div><div class="dna-stat-label">总搜索次数</div></div>
+    <div class="dna-stat"><div class="dna-stat-num">${favorites.length}</div><div class="dna-stat-label">收藏歌曲</div></div>
+    <div class="dna-stat"><div class="dna-stat-num">${history.length}</div><div class="dna-stat-label">历史记录</div></div>
+    <div class="dna-stat"><div class="dna-stat-num">${moodStats.happy||0}</div><div class="dna-stat-label">快乐次数</div></div>`;
+}
+
+function drawDNA(){
+  const canvas=document.getElementById('dna-canvas');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  // 背景
+  ctx.fillStyle='#020818';
+  ctx.fillRect(0,0,W,H);
+
+  // 网格线
+  ctx.strokeStyle='rgba(0,195,255,0.06)';
+  ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+  const total=Math.max(1,Object.values(moodStats).reduce((a,b)=>a+b,0));
+  const moods=[
+    {key:'happy', color:'#ffd700'},
+    {key:'sad',   color:'#6ab4ff'},
+    {key:'angry', color:'#ff6b6b'},
+    {key:'chill', color:'#00ffe7'},
+    {key:'artist',color:'#b57aff'},
+  ];
+
+  // 绘制DNA双螺旋
+  const cx=W/2, amp=70, freq=0.025;
+  const t=Date.now()*0.0005;
+
+  moods.forEach((m, mi)=>{
+    const ratio=(moodStats[m.key]||0)/total;
+    const weight=Math.max(0.2,ratio);
+    const offset=(mi-2)*18;
+
+    ctx.beginPath();
+    ctx.strokeStyle=m.color;
+    ctx.lineWidth=weight*6+1;
+    ctx.globalAlpha=0.15+weight*0.6;
+    for(let x=0;x<W;x+=2){
+      const y=H/2+offset+Math.sin(x*freq+t+mi)*amp*weight;
+      x===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    // 反向链
+    ctx.beginPath();
+    ctx.strokeStyle=m.color;
+    ctx.lineWidth=(weight*4+0.5);
+    ctx.globalAlpha=0.08+weight*0.25;
+    for(let x=0;x<W;x+=2){
+      const y=H/2+offset+Math.sin(x*freq+t+mi+Math.PI)*amp*weight;
+      x===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  });
+
+  ctx.globalAlpha=1;
+
+  // 连接横杆
+  for(let x=30;x<W;x+=50){
+    const baseY=H/2+Math.sin(x*freq+t)*40;
+    moods.forEach((m,mi)=>{
+      const ratio=(moodStats[m.key]||0)/total;
+      const w=Math.max(0.2,ratio);
+      const y1=H/2+(mi-2)*18+Math.sin(x*freq+t+mi)*amp*w;
+      const y2=H/2+(mi-2)*18+Math.sin(x*freq+t+mi+Math.PI)*amp*w;
+      ctx.strokeStyle=m.color;
+      ctx.lineWidth=1;
+      ctx.globalAlpha=0.3;
+      ctx.beginPath();ctx.moveTo(x,y1);ctx.lineTo(x,y2);ctx.stroke();
+      ctx.globalAlpha=0.7;
+      ctx.fillStyle=m.color;
+      ctx.beginPath();ctx.arc(x,y1,2.5,0,Math.PI*2);ctx.fill();
+    });
+  }
+  ctx.globalAlpha=1;
+
+  // 图例
+  moods.forEach((m,i)=>{
+    const ratio=Math.round((moodStats[m.key]||0)/total*100);
+    ctx.fillStyle=m.color;
+    ctx.beginPath();ctx.arc(16,16+i*22,5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(232,244,255,0.7)';
+    ctx.font='11px Orbitron, monospace';
+    ctx.fillText(`${m.key.toUpperCase()}  ${ratio}%`,28,20+i*22);
+  });
+
+  // 水印
+  ctx.fillStyle='rgba(0,195,255,0.18)';
+  ctx.font='bold 12px Orbitron, monospace';
+  ctx.textAlign='right';
+  ctx.fillText('MOOD2MUSIC · DNA CHART',W-16,H-12);
+  ctx.textAlign='left';
+
+  // 动画
+  requestAnimationFrame(drawDNA);
+}
+
+function saveDNA(){
+  const canvas=document.getElementById('dna-canvas');
+  const a=document.createElement('a');
+  a.download='mood2music-dna.png';
+  a.href=canvas.toDataURL();
+  a.click();
+}
+
+// ── 聊天室 ──
+let chatKey='';
+function openChat(title,artist){
+  chatKey=`${title}::${artist}`;
+  document.getElementById('chat-song-label').textContent=`${title} — ${artist}`;
+  document.getElementById('comments-list').innerHTML='<div class="comment-empty">加载中…</div>';
+  document.getElementById('chat-overlay').classList.add('show');
+  fetch(`/comment?key=${encodeURIComponent(chatKey)}`).then(r=>r.json()).then(d=>renderComments(d.comments));
+}
+function closeChat(){document.getElementById('chat-overlay').classList.remove('show');}
+function closeChatIfBg(e){if(e.target.id==='chat-overlay')closeChat();}
+
+function renderComments(comments){
+  const el=document.getElementById('comments-list');
+  if(!comments||!comments.length){el.innerHTML='<div class="comment-empty">还没有留言，来说第一句话吧～</div>';return;}
+  el.innerHTML=comments.map(c=>`
+    <div class="comment-item">
+      <div class="comment-text">${c.text}</div>
+      <div class="comment-time">${c.time}</div>
+    </div>`).join('');
+  el.scrollTop=el.scrollHeight;
+}
+
+function submitComment(){
+  const input=document.getElementById('comment-input');
+  const text=input.value.trim();
+  if(!text) return;
+  fetch('/comment',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({title:chatKey.split('::')[0],artist:chatKey.split('::')[1],text})})
+  .then(r=>r.json()).then(d=>{input.value='';renderComments(d.comments);});
+}
+
+// ── DNA持续动画 ──
+let dnaRunning=false;
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    if(btn.textContent.includes('DNA')) dnaRunning=true;
+    else dnaRunning=false;
+  });
+});
+</script>
+</body>
+</html>
